@@ -1,0 +1,29 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # 1. 우리가 만든 FastAPI 앱
+  api:
+    build: .
+    container_name: crm-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb  # DB가 켜진 뒤에 앱을 켭니다.
+    environment:
+      # ⭐ 중요: Docker 내부에서는 'localhost' 대신 '서비스 이름(mongodb)'을 써야 합니다.
+      - DATABASE_URL=mongodb://mongodb:27017
+      - DATABASE_NAME=clean_crm_db
+
+  # 2. MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: crm-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db  # 데이터를 껐다 켜도 유지되게 저장소 연결
+
+# 데이터 영구 저장을 위한 볼륨 정의
+volumes:
+  mongo_data:
