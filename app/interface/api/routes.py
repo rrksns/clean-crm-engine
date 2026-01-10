@@ -44,3 +44,15 @@ async def create_campaign(
 
     saved_campaign = await repo.add(new_campaign)
     return {"id": saved_campaign.id, "message": "Campaign created successfully"}
+
+# app/interface/api/routes.py (기존 파일에 추가)
+
+@router.post("/events/batch", response_model=List[MessageResponse])
+async def track_event_batch(
+        requests: List[EventRequest], # 리스트로 받습니다!
+        processor: EventProcessor = Depends(get_event_processor)
+):
+    """
+    [성능 최적화] 대량의 이벤트를 한 번에 처리합니다. (Batch Processing)
+    """
+    return await processor.process_event_batch(requests)

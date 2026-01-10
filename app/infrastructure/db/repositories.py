@@ -37,3 +37,24 @@ class MongoCampaignRepository(CampaignRepository):
                 status=doc.status
             ) for doc in docs
         ]
+
+    # app/infrastructure/db/repositories.py (기존 클래스 안에 메서드 추가)
+
+    async def add_all(self, campaigns: List[Campaign]) -> bool:
+        if not campaigns:
+            return False
+
+        # 도메인 객체 -> DB 문서(Document) 리스트로 변환
+        docs = [
+            CampaignDocument(
+                name=c.name,
+                target_event=c.target_event,
+                min_cart_value=c.min_cart_value,
+                message_template=c.message_template,
+                status=c.status
+            ) for c in campaigns
+        ]
+
+        # ✨ 핵심: 한 번의 쿼리로 모두 저장 (Batch Insert)
+        await CampaignDocument.insert_many(docs)
+        return True
