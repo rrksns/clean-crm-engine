@@ -4,9 +4,10 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 
-from app.infrastructure.db.connection import connect_to_mongo
+from app.infrastructure.db.connection import connect_to_mongo, get_db_client
 from app.interface.api.routes import router as api_router
 from app.core.exceptions import CRMEngineException, DatabaseException
+from app.application.dtos import BaseResponse, success_response, error_response
 
 # 로깅 설정
 logging.basicConfig(
@@ -77,6 +78,63 @@ async def global_exception_handler(request: Request, exc: Exception):
 # prefix="/api/v1" -> 모든 주소 앞에 /api/v1이 붙음
 app.include_router(api_router, prefix="/api/v1", tags=["CRM"])
 
-@app.get("/")
+@app.get("/", response_model=BaseResponse)
 async def health_check():
-    return {"status": "ok", "service": "Clean CRM Engine"}
+    """
+    서비스 헬스체크 엔드포인트
+
+    서버와 데이터베이스의 연결 상태를 확인합니다.
+    - 성공: 200 OK (모든 시스템 정상)
+    - 실패: 503 Service Unavailable (DB 연결 실패)
+
+    Returns:
+        BaseResponse: 서비스 상태 정보
+    """
+    health_status = {
+        "service": "Clean CRM Engine",
+        "version": "1.0.0",
+        "status": "healthy"
+    }
+
+    # DB 연결 상태 확인
+    client = get_db_client()
+    if client is None:
+        # 클라이언트가 초기화되지 않음
+        health_status["database"] = "not_initialized"
+        logger.warning("Health check: Database client not initialized")
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=error_response(
+                error_code="DB_NOT_INITIALIZED",
+                error_message="데이터베이스가 초기화되지 않았습니다",
+                message="서비스 일시 중지"
+            ).model_dump()
+        )
+
+    # DB Ping 테스트
+    try:
+        # MongoDB의 admin 명령으로 연결 상태 확인
+        await client.admin.command('ping')
+        health_status["database"] = "connected"
+        logger.info("Health check: All systems operational")
+
+        return success_response(
+            data=health_status,
+            message="모든 시스템 정상 작동 중"
+        )
+
+    except Exception as e:
+        # DB 연결 실패
+        health_status["database"] = "disconnected"
+        health_status["status"] = "unhealthy"
+        logger.error(f"Health check failed: {str(e)}", exc_info=True)
+
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=error_response(
+                error_code="DB_CONNECTION_FAILED",
+                error_message="데이터베이스 연결 실패",
+                details=str(e),
+                message="서비스 일시 중지"
+            ).model_dump()
+        )
