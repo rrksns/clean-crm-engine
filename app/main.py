@@ -8,10 +8,11 @@ from app.infrastructure.db.connection import connect_to_mongo, get_db_client
 from app.interface.api.routes import router as api_router
 from app.core.exceptions import CRMEngineException, DatabaseException
 from app.application.dtos import BaseResponse, success_response, error_response
+from app.core.config import settings
 
-# 로깅 설정
+# 로깅 설정 (환경별 LOG_LEVEL 적용)
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, settings.LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)

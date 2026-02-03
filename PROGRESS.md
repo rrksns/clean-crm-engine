@@ -74,32 +74,28 @@
 
 ---
 
-## 🔄 진행 중인 작업
-
 ### Phase 2: 운영 준비 (계속)
-- [ ] **2-3. 이벤트 저장 기능 구현**
-  - UserEventDocument 모델 추가
-  - 이벤트 이력 저장 (감사 로그)
-  - 메시지 발송 이력 저장 (CrmMessageDocument)
-  - GDPR/개인정보보호법 준수를 위한 데이터 보관
-  - 구현 예정 위치: `app/infrastructure/db/models.py`
+- [x] **2-3. 이벤트 저장 기능 구현**
+  - UserEventDocument, CrmMessageDocument 모델 추가 (`app/infrastructure/db/models.py`)
+  - EventRepository, MessageRepository 인터페이스 + Mongo 구현체
+  - EventProcessor에 이벤트·메시지 저장 로직 연동 (단건·배치 모두)
+  - connection.py에 새 모델 등록
 
-- [ ] **2-4. 환경별 설정 분리**
-  - .env.dev, .env.staging, .env.prod 파일 생성
-  - 환경별 로그 레벨 설정
-  - 환경별 DB 연결 설정
-  - 민감 정보 관리 강화
+- [x] **2-4. 환경별 설정 분리**
+  - `app/core/config.py` 확장 (ENVIRONMENT, LOG_LEVEL, is_production, is_debug)
+  - `.env.dev`, `.env.prod`, `.env.example` 파일 생성
+  - `ENV_FILE` 환경변수로 동적 프로파일 선택
+  - `main.py` 로그 레벨을 config와 연동
+
+- [x] **2-5. API 통합 테스트 작성** ⭐
+  - `tests/test_api.py` — 13개 테스트, 모두 통과
+  - 테스트용 FastAPI 앱 (lifespan 없음) → MongoDB 불필요
+  - FakeRepository + `dependency_overrides`로 완전히 고립된 테스트
+  - 커버리지: 캠페인 등록(3), 단건 이벤트(5), 배치 이벤트(5)
 
 ---
 
 ## 📋 예정된 작업
-
-### Phase 2: 운영 준비 (나머지)
-- [ ] **2-5. API 통합 테스트 작성**
-  - FastAPI TestClient 활용
-  - 엔드포인트별 통합 테스트
-  - 파일 위치: `tests/test_api.py`
-  - DB Mock/실제 DB 연동 테스트
 
 ### Phase 3: 성능 & 보안 최적화 (1개월 이내)
 
@@ -183,10 +179,8 @@
 ## 🐛 알려진 이슈 & 기술 부채
 
 ### 우선순위 높음
-- [ ] Repository 인터페이스 불완전
-  - `add_all()` 메서드가 인터페이스에 명시되지 않음
-  - 구현체에만 존재하여 인터페이스 계약 위반
-  - 수정 필요: `app/application/interfaces.py`
+- [x] Repository 인터페이스 불완전 → **해소완료**
+  - `add_all()` + `EventRepository` + `MessageRepository` 인터페이스 추가
 
 ### 우선순위 중간
 - [ ] API 응답 형식 마이그레이션
@@ -194,10 +188,10 @@
   - `/api/v1/events`, `/api/v1/campaigns` 등
   - 하위 호환성 고려
 
-- [ ] 테스트 커버리지 부족
-  - API 통합 테스트 없음
-  - E2E 테스트 없음
-  - 목표: 80% 이상 커버리지
+- [x] 테스트 커버리지 부족 → **해소완료**
+  - API 통합 테스트: 13개 (test_api.py)
+  - 도메인 테스트: 1개 (test_domain.py)
+  - 남은 목표: E2E 테스트
 
 ### 우선순위 낮음
 - [ ] 타입 힌팅 개선
@@ -234,25 +228,11 @@
 
 ## 🎯 다음 Sprint 목표 (우선순위 순)
 
-1. **Repository 인터페이스 정리** (1시간)
-   - `add_all()` 메서드를 인터페이스에 추가
-   - 기술 부채 해소
-
-2. **이벤트 저장 기능** (2~3시간)
-   - UserEventDocument, CrmMessageDocument 모델 추가
-   - Repository 구현
-   - 감사 로그 기능 완성
-
-3. **API 통합 테스트** (3~4시간)
-   - TestClient 활용
-   - 엔드포인트별 테스트 작성
-   - CI/CD 파이프라인 준비
-
-4. **환경별 설정 분리** (1~2시간)
-   - .env 파일 분리
-   - 환경별 로그 레벨 설정
-
-5. **페이지네이션 구현** (2~3시간)
+1. ✅ **Repository 인터페이스 정리** — 완료
+2. ✅ **이벤트 저장 기능** — 완료
+3. ✅ **API 통합 테스트** — 13개 테스트 완료
+4. ✅ **환경별 설정 분리** — 완료
+5. **페이지네이션 구현** (다음 Sprint)
    - 캠페인 목록 조회 API
    - cursor 기반 페이지네이션
 
@@ -267,5 +247,5 @@
 
 ---
 
-**마지막 업데이트**: 2026-02-02
+**마지막 업데이트**: 2026-02-03
 **다음 리뷰 일정**: Phase 2 완료 후

@@ -1,9 +1,9 @@
 # app/infrastructure/db/repositories.py
 from typing import List
 from pymongo.errors import PyMongoError, DuplicateKeyError
-from app.application.interfaces import CampaignRepository
-from app.domain.models import Campaign
-from app.infrastructure.db.models import CampaignDocument
+from app.application.interfaces import CampaignRepository, EventRepository, MessageRepository
+from app.domain.models import Campaign, UserEvent, CrmMessage
+from app.infrastructure.db.models import CampaignDocument, UserEventDocument, CrmMessageDocument
 from app.core.exceptions import (
     DatabaseQueryException,
     DuplicateResourceException
@@ -104,5 +104,91 @@ class MongoCampaignRepository(CampaignRepository):
             # MongoDB 배치 삽입 실패
             raise DatabaseQueryException(
                 operation="batch insert campaigns",
+                details=str(e)
+            ) from e
+
+
+class MongoEventRepository(EventRepository):
+
+    async def save(self, event: UserEvent) -> UserEvent:
+        try:
+            doc = UserEventDocument(
+                user_id=event.user_id,
+                event_type=event.event_type,
+                metadata=event.metadata,
+                occurred_at=event.occurred_at
+            )
+            await doc.insert()
+            return event
+
+        except PyMongoError as e:
+            raise DatabaseQueryException(
+                operation="insert user event",
+                details=str(e)
+            ) from e
+
+    async def save_all(self, events: List[UserEvent]) -> bool:
+        if not events:
+            return False
+
+        try:
+            docs = [
+                UserEventDocument(
+                    user_id=e.user_id,
+                    event_type=e.event_type,
+                    metadata=e.metadata,
+                    occurred_at=e.occurred_at
+                ) for e in events
+            ]
+            await UserEventDocument.insert_many(docs)
+            return True
+
+        except PyMongoError as e:
+            raise DatabaseQueryException(
+                operation="batch insert user events",
+                details=str(e)
+            ) from e
+
+
+class MongoMessageRepository(MessageRepository):
+
+    async def save(self, message: CrmMessage) -> CrmMessage:
+        try:
+            doc = CrmMessageDocument(
+                user_id=message.user_id,
+                campaign_id=message.campaign_id,
+                campaign_name="",
+                content=message.content,
+                sent_at=message.sent_at
+            )
+            await doc.insert()
+            return message
+
+        except PyMongoError as e:
+            raise DatabaseQueryException(
+                operation="insert crm message",
+                details=str(e)
+            ) from e
+
+    async def save_all(self, messages: List[CrmMessage]) -> bool:
+        if not messages:
+            return False
+
+        try:
+            docs = [
+                CrmMessageDocument(
+                    user_id=m.user_id,
+                    campaign_id=m.campaign_id,
+                    campaign_name="",
+                    content=m.content,
+                    sent_at=m.sent_at
+                ) for m in messages
+            ]
+            await CrmMessageDocument.insert_many(docs)
+            return True
+
+        except PyMongoError as e:
+            raise DatabaseQueryException(
+                operation="batch insert crm messages",
                 details=str(e)
             ) from e

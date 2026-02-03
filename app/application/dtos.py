@@ -1,5 +1,5 @@
 # app/application/dtos.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Dict, Any, Optional, Generic, TypeVar
 from datetime import datetime
 from app.domain.models import EventType
@@ -62,16 +62,15 @@ class BaseResponse(BaseModel, Generic[T]):
         description="응답 생성 시간 (ISO 8601)"
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "data": {"id": "123", "name": "Example"},
-                "error": None,
-                "message": "처리 완료",
-                "timestamp": "2026-02-02T10:30:00"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "data": {"id": "123", "name": "Example"},
+            "error": None,
+            "message": "처리 완료",
+            "timestamp": "2026-02-02T10:30:00"
         }
+    })
 
 
 # 편의 함수: 성공 응답 생성

@@ -7,8 +7,8 @@ Phase 1 작업 검증 스크립트
 """
 import asyncio
 from typing import List
-from app.application.interfaces import CampaignRepository
-from app.domain.models import Campaign, EventType, CampaignStatus
+from app.application.interfaces import CampaignRepository, EventRepository, MessageRepository
+from app.domain.models import Campaign, UserEvent, CrmMessage, EventType, CampaignStatus
 from app.application.event_processor import EventProcessor
 from app.application.dtos import EventRequest
 from app.core.exceptions import ValidationException
@@ -26,6 +26,36 @@ class FakeCampaignRepository(CampaignRepository):
     async def get_active_campaigns(self) -> List[Campaign]:
         return [c for c in self.store if c.status == CampaignStatus.ACTIVE]
 
+    async def add_all(self, campaigns: List[Campaign]) -> bool:
+        self.store.extend(campaigns)
+        return bool(campaigns)
+
+
+class FakeEventRepository(EventRepository):
+    def __init__(self):
+        self.store = []
+
+    async def save(self, event: UserEvent) -> UserEvent:
+        self.store.append(event)
+        return event
+
+    async def save_all(self, events: List[UserEvent]) -> bool:
+        self.store.extend(events)
+        return bool(events)
+
+
+class FakeMessageRepository(MessageRepository):
+    def __init__(self):
+        self.store = []
+
+    async def save(self, message: CrmMessage) -> CrmMessage:
+        self.store.append(message)
+        return message
+
+    async def save_all(self, messages: List[CrmMessage]) -> bool:
+        self.store.extend(messages)
+        return bool(messages)
+
 
 async def test_batch_processing():
     """배치 처리 기능 테스트"""
@@ -34,7 +64,11 @@ async def test_batch_processing():
 
     # 준비
     fake_repo = FakeCampaignRepository()
-    processor = EventProcessor(repository=fake_repo)
+    processor = EventProcessor(
+        repository=fake_repo,
+        event_repo=FakeEventRepository(),
+        message_repo=FakeMessageRepository()
+    )
 
     # 캠페인 데이터 미리 세팅
     await fake_repo.add(Campaign(
@@ -102,7 +136,11 @@ async def test_error_handling():
 
     # 준비
     fake_repo = FakeCampaignRepository()
-    processor = EventProcessor(repository=fake_repo)
+    processor = EventProcessor(
+        repository=fake_repo,
+        event_repo=FakeEventRepository(),
+        message_repo=FakeMessageRepository()
+    )
 
     # 테스트 1: 빈 배치 요청
     print("  [2-1] 빈 배치 요청 처리...")
@@ -136,7 +174,11 @@ async def test_performance_comparison():
 
     # 준비
     fake_repo = FakeCampaignRepository()
-    processor = EventProcessor(repository=fake_repo)
+    processor = EventProcessor(
+        repository=fake_repo,
+        event_repo=FakeEventRepository(),
+        message_repo=FakeMessageRepository()
+    )
 
     # 캠페인 추가
     await fake_repo.add(Campaign(

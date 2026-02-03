@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from typing import Optional
 from app.core.config import settings
-from app.infrastructure.db.models import CampaignDocument
+from app.infrastructure.db.models import CampaignDocument, UserEventDocument, CrmMessageDocument
 
 # 전역 변수: DB 클라이언트 (헬스체크 등에서 사용)
 _client: Optional[AsyncIOMotorClient] = None
@@ -26,7 +26,7 @@ async def connect_to_mongo():
 
     # 3. Beanie 초기화 (Document 모델 등록)
     # 여기에 모델을 등록해야 DB와 매핑이 됩니다.
-    await init_beanie(database=_database, document_models=[CampaignDocument])
+    await init_beanie(database=_database, document_models=[CampaignDocument, UserEventDocument, CrmMessageDocument])
 
     print(f"✅ Connected to MongoDB: {settings.DATABASE_NAME}")
 
