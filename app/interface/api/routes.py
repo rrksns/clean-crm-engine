@@ -1,9 +1,12 @@
 # app/interface/api/routes.py
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Optional
 import logging
 
-from app.application.dtos import EventRequest, MessageResponse, CampaignCreateRequest
+from app.application.dtos import (
+    EventRequest, MessageResponse, CampaignCreateRequest,
+    CampaignResponse, PaginatedCampaignResponse, BaseResponse, success_response
+)
 from app.application.event_processor import EventProcessor
 from app.dependencies import get_event_processor, get_campaign_repository
 from app.application.interfaces import CampaignRepository
@@ -139,7 +142,72 @@ async def create_campaign(
             }
         )
 
-# --- 3. 배치 이벤트 처리 API (성능 최적화) ---
+# --- 3. 캠페인 목록 조회 API (페이지네이션) ---
+@router.get("/campaigns", response_model=BaseResponse)
+async def list_campaigns(
+        cursor: Optional[str] = Query(None, description="페이지네이션 커서 (마지막 항목의 ID)"),
+        limit: int = Query(20, ge=1, le=100, description="페이지당 항목 수 (1~100, 기본 20)"),
+        campaign_status: Optional[CampaignStatus] = Query(None, alias="status", description="상태별 필터 (active/paused/ended)"),
+        repo: CampaignRepository = Depends(get_campaign_repository)
+):
+    """
+    캠페인 목록을 커서 기반 페이지네이션으로 조회합니다.
+
+    - 기본 정렬: 등록 일시 내림차순 (최신 우선)
+    - 커서: 응답의 next_cursor 값을 다음 요청에 전달
+    """
+    try:
+        campaigns, next_cursor = await repo.get_campaigns(
+            cursor=cursor,
+            limit=limit,
+            status=campaign_status
+        )
+
+        # Domain → Response DTO 변환
+        items = [
+            CampaignResponse(
+                id=c.id,
+                name=c.name,
+                target_event=c.target_event,
+                min_cart_value=c.min_cart_value,
+                message_template=c.message_template,
+                status=c.status
+            ) for c in campaigns
+        ]
+
+        return success_response(
+            data=PaginatedCampaignResponse(
+                items=items,
+                next_cursor=next_cursor,
+                has_next=next_cursor is not None,
+                limit=limit
+            ),
+            message="캠페인 목록 조회 완료"
+        )
+
+    except ValidationException as e:
+        logger.warning(f"Validation error in list_campaigns: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_code": e.code, "message": e.message, "details": e.details}
+        )
+
+    except DatabaseException as e:
+        logger.error(f"Database error in list_campaigns: {e.message}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error_code": e.code, "message": "캠페인 목록 조회 중 DB 오류", "details": e.details}
+        )
+
+    except Exception as e:
+        logger.error(f"Unexpected error in list_campaigns: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error_code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다"}
+        )
+
+
+# --- 4. 배치 이벤트 처리 API (성능 최적화) ---
 @router.post("/events/batch", response_model=List[MessageResponse])
 async def track_event_batch(
         requests: List[EventRequest],  # 리스트로 받습니다!

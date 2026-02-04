@@ -1,12 +1,15 @@
 # app/infrastructure/db/repositories.py
-from typing import List
+from typing import List, Optional, Tuple
 from pymongo.errors import PyMongoError, DuplicateKeyError
+from bson import ObjectId
+from bson.errors import InvalidId
 from app.application.interfaces import CampaignRepository, EventRepository, MessageRepository
-from app.domain.models import Campaign, UserEvent, CrmMessage
+from app.domain.models import Campaign, UserEvent, CrmMessage, CampaignStatus
 from app.infrastructure.db.models import CampaignDocument, UserEventDocument, CrmMessageDocument
 from app.core.exceptions import (
     DatabaseQueryException,
-    DuplicateResourceException
+    DuplicateResourceException,
+    ValidationException
 )
 
 class MongoCampaignRepository(CampaignRepository):
@@ -104,6 +107,61 @@ class MongoCampaignRepository(CampaignRepository):
             # MongoDB 배치 삽입 실패
             raise DatabaseQueryException(
                 operation="batch insert campaigns",
+                details=str(e)
+            ) from e
+
+
+    # 4. 커서 기반 페이지네이션 조회
+    async def get_campaigns(
+        self,
+        cursor: Optional[str] = None,
+        limit: int = 20,
+        status: Optional[CampaignStatus] = None
+    ) -> Tuple[List[Campaign], Optional[str]]:
+        try:
+            # 필터 구성
+            filter_query = {}
+            if status:
+                filter_query["status"] = status.value
+            if cursor:
+                try:
+                    filter_query["_id"] = {"$lt": ObjectId(cursor)}
+                except InvalidId:
+                    raise ValidationException(
+                        field="cursor",
+                        reason="유효하지 않은 커서 형식입니다"
+                    )
+
+            # limit + 1개 조회 → 다음 페이지 존재 여부 판단
+            docs = await CampaignDocument.find(filter_query) \
+                .sort([("_id", -1)]) \
+                .limit(limit + 1) \
+                .to_list()
+
+            has_next = len(docs) > limit
+            if has_next:
+                docs = docs[:limit]  # 초과분 제거
+
+            campaigns = [
+                Campaign(
+                    id=str(doc.id),
+                    name=doc.name,
+                    target_event=doc.target_event,
+                    min_cart_value=doc.min_cart_value,
+                    message_template=doc.message_template,
+                    status=doc.status
+                ) for doc in docs
+            ]
+
+            next_cursor = str(docs[-1].id) if has_next else None
+
+            return campaigns, next_cursor
+
+        except ValidationException:
+            raise  # ValidationException는 그대로 전파
+        except PyMongoError as e:
+            raise DatabaseQueryException(
+                operation="get campaigns paginated",
                 details=str(e)
             ) from e
 

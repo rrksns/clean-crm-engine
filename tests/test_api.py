@@ -6,7 +6,7 @@ FastAPI TestClient + FakeRepository를 사용하여 실제 HTTP 흐름을 검증
 MongoDB 없이도 엔드포인트의 요청·응답·에러 핸들링을 테스트할 수 있습니다.
 """
 import pytest
-from typing import List
+from typing import List, Optional, Tuple
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
@@ -70,6 +70,35 @@ class FakeCampaignRepository(CampaignRepository):
     async def add_all(self, campaigns: List[Campaign]) -> bool:
         self.store.extend(campaigns)
         return bool(campaigns)
+
+    async def get_campaigns(
+        self,
+        cursor: Optional[str] = None,
+        limit: int = 20,
+        status: Optional[CampaignStatus] = None
+    ) -> Tuple[List[Campaign], Optional[str]]:
+        # 상태 필터
+        filtered = [c for c in self.store if status is None or c.status == status]
+
+        # 등록 순서 역방향 (최신 우선) — store 순서가 삽입 순서
+        filtered = list(reversed(filtered))
+
+        # 커서 적용: cursor ID와 동일한 항목 이후부터
+        start = 0
+        if cursor:
+            for i, c in enumerate(filtered):
+                if c.id == cursor:
+                    start = i + 1
+                    break
+
+        # limit + 1개 조회 후 has_next 판단
+        page = filtered[start:start + limit + 1]
+        has_next = len(page) > limit
+        if has_next:
+            page = page[:limit]
+
+        next_cursor = page[-1].id if has_next else None
+        return page, next_cursor
 
 
 class FakeEventRepository(EventRepository):
@@ -352,3 +381,71 @@ class TestTrackEventBatch:
         ])
 
         assert response.status_code == 422
+
+
+# ──────────────────────────────────────────────────
+# 테스트: GET /api/v1/campaigns (캠페인 목록 페이지네이션)
+# ──────────────────────────────────────────────────
+
+class TestListCampaigns:
+
+    def test_list_campaigns_empty(self, client):
+        """캠페인이 없을 때 → 빈 리스트"""
+        response = client.get("/api/v1/campaigns")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert body["data"]["items"] == []
+        assert body["data"]["has_next"] is False
+        assert body["data"]["next_cursor"] is None
+
+    def test_list_campaigns_basic(self, client_with_campaigns):
+        """3개 캠페인 조회 → 전체 반환"""
+        response = client_with_campaigns.get("/api/v1/campaigns")
+        assert response.status_code == 200
+        assert len(response.json()["data"]["items"]) == 3
+
+    def test_list_campaigns_with_limit(self, client_with_campaigns):
+        """limit=2 → 2개 반환, has_next=True"""
+        response = client_with_campaigns.get("/api/v1/campaigns?limit=2")
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert len(data["items"]) == 2
+        assert data["has_next"] is True
+        assert data["next_cursor"] is not None
+
+    def test_list_campaigns_pagination_flow(self, client_with_campaigns):
+        """전체 페이지네이션 흐름: 페이지1 → 페이지2"""
+        # 페이지 1
+        r1 = client_with_campaigns.get("/api/v1/campaigns?limit=2")
+        d1 = r1.json()["data"]
+        assert len(d1["items"]) == 2
+        assert d1["has_next"] is True
+
+        # 페이지 2 (cursor 사용)
+        r2 = client_with_campaigns.get(f"/api/v1/campaigns?limit=2&cursor={d1['next_cursor']}")
+        d2 = r2.json()["data"]
+        assert len(d2["items"]) == 1    # 남은 1개
+        assert d2["has_next"] is False
+        assert d2["next_cursor"] is None
+
+        # 중복 없음 확인
+        ids_p1 = {item["id"] for item in d1["items"]}
+        ids_p2 = {item["id"] for item in d2["items"]}
+        assert ids_p1.isdisjoint(ids_p2)
+
+    def test_list_campaigns_filter_by_status(self, client_with_campaigns):
+        """status=active 필터 → PAUSED 제외"""
+        response = client_with_campaigns.get("/api/v1/campaigns?status=active")
+        assert response.status_code == 200
+        items = response.json()["data"]["items"]
+        assert all(item["status"] == "active" for item in items)
+        assert len(items) == 2  # client_with_campaigns에서 ACTIVE 2개
+
+    def test_list_campaigns_invalid_limit(self, client):
+        """limit=0 또는 limit=200 → 422 (FastAPI Query 검증)"""
+        r1 = client.get("/api/v1/campaigns?limit=0")
+        assert r1.status_code == 422
+
+        r2 = client.get("/api/v1/campaigns?limit=200")
+        assert r2.status_code == 422

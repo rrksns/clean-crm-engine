@@ -1,8 +1,8 @@
 # app/application/dtos.py
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, Any, Optional, Generic, TypeVar
+from typing import Dict, Any, Optional, Generic, TypeVar, List
 from datetime import datetime
-from app.domain.models import EventType
+from app.domain.models import EventType, CampaignStatus
 
 # Generic 타입 변수 (어떤 타입이든 담을 수 있도록)
 T = TypeVar('T')
@@ -25,6 +25,23 @@ class MessageResponse(BaseModel):
     user_id: str
     content: str
     campaign_name: str
+
+
+# 4. 단일 캠페인 응답 (Response DTO)
+class CampaignResponse(BaseModel):
+    id: str
+    name: str
+    target_event: EventType
+    min_cart_value: int
+    message_template: str
+    status: CampaignStatus
+
+# 5. 페이지네이션된 캠페인 목록 응답 (Response DTO)
+class PaginatedCampaignResponse(BaseModel):
+    items: List[CampaignResponse]
+    next_cursor: Optional[str] = None   # 다음 페이지 없으면 None
+    has_next: bool
+    limit: int
 
 
 # ──────────────────────────────────────────────────
