@@ -19,6 +19,7 @@
 * **실시간 이벤트 감지:** 장바구니 담기, 상품 조회 등 사용자 행동 수집.
 * **타겟팅 룰 엔진:** 마케터가 설정한 조건(예: 5만원 이상 장바구니 & 미구매) 매칭 로직.
 * **고성능 배치 처리:** 대량의 이벤트를 한 번에 처리하는 `Batch API` 구현 (단건 대비 **20배 성능 향상**).
+* **Redis 캐싱:** 활성 캠페인 조회에 Cache-Aside 패턴 적용, 반복 조회 성능 대폭 향상 (TTL 5분).
 * **계층별 에러 핸들링:** Repository → API → 전역 핸들러 3단계 방어선, 7가지 커스텀 예외 클래스.
 * **API 응답 표준화:** 성공/에러 응답 일관된 형식 제공 (BaseResponse), 타임스탬프 자동 생성.
 * **헬스체크 강화:** MongoDB 연결 상태 실시간 확인, K8s liveness/readiness probe 지원.
@@ -67,6 +68,26 @@ Presentation → Application → Domain ← Infrastructure
 1. **캠페인 캐싱**: 활성 캠페인을 한 번만 조회하여 메모리에서 재사용
 2. **배치 삽입**: `Repository.add_all()` - 여러 레코드를 한 번에 저장
 3. **비동기 처리**: Motor 드라이버로 non-blocking I/O 수행
+
+### Redis 캐싱 (Cache-Aside 패턴)
+반복되는 활성 캠페인 조회를 최적화하여 DB 부하를 감소시킵니다.
+
+```python
+# get_active_campaigns() 호출 흐름:
+# 1. Redis 캐시 확인 → 히트 시 즉시 반환 (DB 조회 생략)
+# 2. 캐시 미스 → MongoDB 조회
+# 3. 조회 결과를 Redis에 저장 (TTL: 5분)
+# 4. 결과 반환
+
+# 캠페인 추가/수정 시:
+# - add() / add_all() 성공 후 자동으로 캐시 무효화
+# - 다음 조회 시 최신 데이터로 캐시 재생성
+```
+
+**Graceful Degradation:**
+- Redis 다운 시 자동으로 MongoDB로 폴백
+- 캐시 장애가 전체 시스템에 영향을 주지 않음
+- 앱 시작 시 Redis 연결 실패해도 정상 동작
 
 ---
 
@@ -167,7 +188,7 @@ POST /api/v1/campaigns
 
 ### 1. Docker Compose로 실행 (권장)
 ```bash
-# MongoDB + 애플리케이션 실행
+# MongoDB + Redis + 애플리케이션 실행
 docker-compose up --build
 
 # API 문서 확인
@@ -183,8 +204,8 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 # 2. 의존성 설치
 pip install -r requirements.txt
 
-# 3. MongoDB 실행 (Docker)
-docker-compose up -d mongo
+# 3. MongoDB + Redis 실행 (Docker)
+docker-compose up -d mongodb redis
 
 # 4. 서버 실행
 uvicorn app.main:app --reload
@@ -198,17 +219,17 @@ open http://localhost:8000/docs
 ## 🧪 테스트
 
 ```bash
-# 전체 테스트 실행
-pytest
+# 전체 테스트 실행 (25개)
+PYTHONPATH=. pytest tests/ -v
 
-# Phase 1 검증 (배치 처리 & 에러 핸들링)
-python test_phase1.py
+# API 테스트 (19개)
+PYTHONPATH=. pytest tests/test_api.py -v
 
-# Phase 2 검증 (API 응답 표준화 & 헬스체크)
-python test_phase2.py
+# 캐시 테스트 (5개)
+PYTHONPATH=. python tests/test_cache.py
 
-# 도메인 로직 테스트
-pytest tests/test_domain.py -v
+# 도메인 로직 테스트 (1개)
+PYTHONPATH=. pytest tests/test_domain.py -v
 ```
 
 ---
@@ -226,11 +247,12 @@ pytest tests/test_domain.py -v
 | 항목 | 성과 |
 |-----|------|
 | **성능** | 배치 처리로 **20배 향상** (100개 이벤트: 10초 → 0.5초) |
+| **캐싱** | Redis Cache-Aside 패턴 적용, 반복 조회 성능 향상 |
 | **아키텍처** | Clean Architecture + DDD 적용 |
 | **에러 처리** | 3계층 방어선 (Repository → API → 전역) |
-| **테스트** | 도메인/Application/Phase 검증 테스트 완료 |
-| **운영 준비** | 헬스체크, 로깅, 표준화된 API 응답 |
-| **문서화** | 547줄 가이드 문서 (CLAUDE.md) |
+| **테스트** | 25개 테스트 통과 (API 19, 캐시 5, 도메인 1) |
+| **운영 준비** | 헬스체크, 로깅, 표준화된 API 응답, graceful degradation |
+| **문서화** | CLAUDE.md, README.md, PROGRESS.md 지속 업데이트 |
 
 ---
 
@@ -244,6 +266,10 @@ pytest tests/test_domain.py -v
 - MongoDB 5.0+ (NoSQL 데이터베이스)
 - Motor (비동기 MongoDB 드라이버)
 - Beanie 1.20+ (MongoDB ODM)
+
+**Cache:**
+- Redis 7.x (인메모리 캐시)
+- redis-py 7.0+ (비동기 Redis 클라이언트)
 
 **Infrastructure:**
 - Docker & Docker Compose (컨테이너화)
@@ -268,5 +294,5 @@ pytest tests/test_domain.py -v
 
 ---
 
-**마지막 업데이트**: 2026-02-02
-**다음 계획**: 이벤트 저장 기능, 페이지네이션, 캐싱 레이어 구현
+**마지막 업데이트**: 2026-02-06
+**다음 계획**: 데이터베이스 인덱스 최적화, Rate Limiting 구현

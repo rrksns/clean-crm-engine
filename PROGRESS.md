@@ -1,6 +1,6 @@
 # 🚀 프로젝트 진행 상황
 
-## 📅 최종 업데이트: 2026-02-05
+## 📅 최종 업데이트: 2026-02-06
 
 ---
 
@@ -108,11 +108,15 @@
   - CampaignResponse, PaginatedCampaignResponse DTO 추가
   - 테스트 6개 추가 (총 19개 → 모두 통과)
 
-- [ ] **3-2. 캐싱 레이어 구현**
-  - Redis 연동
-  - 활성 캠페인 캐싱 (TTL: 5분)
-  - 캐시 무효화 전략
-  - 의존성: `redis`, `aioredis`
+- [x] **3-2. 캐싱 레이어 구현** ✅
+  - Redis 연동 (redis 7.x 비동기 클라이언트)
+  - get_active_campaigns()에 Cache-Aside 패턴 적용
+  - 활성 캠페인 캐싱 (TTL: 5분, 키: "crm:campaigns:active")
+  - add()/add_all() 성공 후 자동 캐시 무효화
+  - Graceful degradation (Redis 다운 시 DB 폴백)
+  - RedisCacheService 구현 (get/set/delete 메서드)
+  - Docker Compose에 Redis 서비스 추가
+  - 캐시 테스트 5개 추가 (총 25개 테스트 통과)
 
 - [ ] **3-3. 데이터베이스 인덱스 최적화**
   - 복합 인덱스 추가 (status + target_event)
@@ -215,11 +219,16 @@
   - 배치: 100개 이벤트 처리 시 ~0.5초
   - DB 조회: 100회 → 1회
 
+- **Redis 캐싱**: 활성 캠페인 조회 성능 향상
+  - Cache-Aside 패턴 적용
+  - 캐시 히트 시 DB 조회 생략 (응답 속도 대폭 향상)
+  - TTL 5분, Redis 장애 시 자동 DB 폴백
+
 ### 코드 품질
 - **아키텍처**: Clean Architecture + DDD 적용
-- **테스트**: 도메인 로직, Application 로직, Phase 1/2 검증 테스트 완료
+- **테스트**: 25개 통과 (API 19개, 캐시 5개, 도메인 1개)
 - **에러 처리**: 3계층 방어선 (Repository → API → 전역)
-- **문서화**: CLAUDE.md (547줄), README.md 업데이트
+- **문서화**: CLAUDE.md, README.md, PROGRESS.md 지속 업데이트
 
 ### 운영 준비도
 - **헬스체크**: DB 연결 상태 실시간 확인
@@ -236,9 +245,10 @@
 3. ✅ **API 통합 테스트** — 19개 테스트 완료
 4. ✅ **환경별 설정 분리** — 완료
 5. ✅ **페이지네이션 구현** — 완료 (cursor 기반, 테스트 6개)
-6. **캐싱 레이어 구현** (다음 Sprint)
-   - Redis 연동
-   - 활성 캠페인 캐싱 (TTL: 5분)
+6. ✅ **캐싱 레이어 구현** — 완료 (Redis Cache-Aside 패턴, 테스트 5개)
+7. **데이터베이스 인덱스 최적화** (다음 Sprint)
+   - 복합 인덱스 추가 (status + target_event)
+   - 쿼리 성능 분석 및 최적화
 
 ---
 
@@ -251,5 +261,5 @@
 
 ---
 
-**마지막 업데이트**: 2026-02-05
-**다음 리뷰 일정**: Phase 3-2 (캐싱 레이어) 완료 후
+**마지막 업데이트**: 2026-02-06
+**다음 리뷰 일정**: Phase 3-3 (DB 인덱스 최적화) 완료 후
