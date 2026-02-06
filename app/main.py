@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from app.infrastructure.db.connection import connect_to_mongo, get_db_client
+from app.infrastructure.cache.redis_cache import connect_to_redis, close_redis
 from app.interface.api.routes import router as api_router
 from app.core.exceptions import CRMEngineException, DatabaseException
 from app.application.dtos import BaseResponse, success_response, error_response
@@ -21,8 +22,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # 앱 시작 시 DB 연결
     await connect_to_mongo()
+    # Redis 연결 (실패해도 앱은 시작됨)
+    try:
+        await connect_to_redis()
+    except Exception as e:
+        logger.warning(f"Redis 연결 실패, 캐시 없이 운영됩니다: {e}")
     yield
-    # 앱 종료 시 로직 (필요하면 추가)
+    # 앱 종료 시 Redis 연결 종료
+    await close_redis()
 
 app = FastAPI(
     title="Clean CRM Engine",

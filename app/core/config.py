@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "clean_crm_db"
 
+    # Redis 연결
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # 로깅
     LOG_LEVEL: str = "INFO"
 

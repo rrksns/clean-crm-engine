@@ -4,5 +4,6 @@ pydantic
 pydantic-settings
 motor           # MongoDB 비동기 드라이버
 beanie          # MongoDB ODM
+redis           # Redis 비동기 클라이언트 (4.x에서 aioredis 통합)
 python-dotenv
 pytest          # 테스트 프레임워크

@@ -56,3 +56,17 @@ class MessageRepository(ABC):
     @abstractmethod
     async def save_all(self, messages: List[CrmMessage]) -> bool:
         pass
+
+
+class CacheService(ABC):
+    @abstractmethod
+    async def get(self, key: str) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    async def set(self, key: str, value: str, ttl: int) -> None:
+        pass
+
+    @abstractmethod
+    async def delete(self, key: str) -> None:
+        pass

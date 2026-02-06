@@ -4,11 +4,12 @@ from app.infrastructure.db.repositories import (
     MongoEventRepository,
     MongoMessageRepository
 )
+from app.infrastructure.cache.redis_cache import RedisCacheService
 from app.application.event_processor import EventProcessor
 
 # Spring의 @Bean 정의와 비슷합니다.
 def get_campaign_repository() -> MongoCampaignRepository:
-    return MongoCampaignRepository()
+    return MongoCampaignRepository(cache=RedisCacheService())
 
 def get_event_repository() -> MongoEventRepository:
     return MongoEventRepository()
