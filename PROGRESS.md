@@ -1,6 +1,6 @@
 # 🚀 프로젝트 진행 상황
 
-## 📅 최종 업데이트: 2026-02-06
+## 📅 최종 업데이트: 2026-02-08
 
 ---
 
@@ -118,10 +118,14 @@
   - Docker Compose에 Redis 서비스 추가
   - 캐시 테스트 5개 추가 (총 25개 테스트 통과)
 
-- [ ] **3-3. 데이터베이스 인덱스 최적화**
-  - 복합 인덱스 추가 (status + target_event)
-  - 쿼리 성능 분석 및 최적화
-  - explain() 명령으로 실행 계획 확인
+- [x] **3-3. 데이터베이스 인덱스 최적화** ✅
+  - CampaignDocument: status + _id 복합 인덱스 (get_active_campaigns, get_campaigns 최적화)
+  - UserEventDocument: user_id, event_type, occurred_at 인덱스 (향후 조회용)
+  - CrmMessageDocument: user_id, campaign_id, sent_at 인덱스 (향후 조회용)
+  - 인덱스 확인 스크립트 추가 (scripts/check_indexes.py)
+  - 쿼리 실행 계획(explain) 분석 도구 제공
+  - 인덱스 생성 검증 테스트 3개 추가 (tests/test_indexes.py)
+  - COLLSCAN 방지, 모든 쿼리가 IXSCAN 사용
 
 #### 보안 강화
 - [ ] **3-4. Rate Limiting 구현**
@@ -224,9 +228,15 @@
   - 캐시 히트 시 DB 조회 생략 (응답 속도 대폭 향상)
   - TTL 5분, Redis 장애 시 자동 DB 폴백
 
+- **인덱스 최적화**: 쿼리 성능 O(log n) 개선
+  - 복합 인덱스로 status 필터 + _id 정렬 동시 최적화
+  - COLLSCAN → IXSCAN 전환 (전체 컬렉션 스캔 방지)
+  - 데이터 증가 시에도 일정한 성능 유지
+  - 총 10개 인덱스 생성 (campaigns 1개, user_events 3개, crm_messages 3개)
+
 ### 코드 품질
 - **아키텍처**: Clean Architecture + DDD 적용
-- **테스트**: 25개 통과 (API 19개, 캐시 5개, 도메인 1개)
+- **테스트**: 28개 통과 (API 19개, 캐시 5개, 인덱스 3개, 도메인 1개)
 - **에러 처리**: 3계층 방어선 (Repository → API → 전역)
 - **문서화**: CLAUDE.md, README.md, PROGRESS.md 지속 업데이트
 
@@ -246,9 +256,10 @@
 4. ✅ **환경별 설정 분리** — 완료
 5. ✅ **페이지네이션 구현** — 완료 (cursor 기반, 테스트 6개)
 6. ✅ **캐싱 레이어 구현** — 완료 (Redis Cache-Aside 패턴, 테스트 5개)
-7. **데이터베이스 인덱스 최적화** (다음 Sprint)
-   - 복합 인덱스 추가 (status + target_event)
-   - 쿼리 성능 분석 및 최적화
+7. ✅ **데이터베이스 인덱스 최적화** — 완료 (10개 인덱스, 테스트 3개)
+8. **Rate Limiting 구현** (다음 Sprint)
+   - API 남용 방지
+   - IP 기반 요청 제한 (100 req/min)
 
 ---
 
@@ -261,5 +272,5 @@
 
 ---
 
-**마지막 업데이트**: 2026-02-06
-**다음 리뷰 일정**: Phase 3-3 (DB 인덱스 최적화) 완료 후
+**마지막 업데이트**: 2026-02-08
+**다음 리뷰 일정**: Phase 3-4 (Rate Limiting) 완료 후
