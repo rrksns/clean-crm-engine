@@ -6,7 +6,8 @@ import logging
 
 from app.infrastructure.db.connection import connect_to_mongo, get_db_client
 from app.infrastructure.cache.redis_cache import connect_to_redis, close_redis
-from app.interface.api.routes import router as api_router
+from app.interface.api.routes import router as api_router_v1
+from app.interface.api.routes_v2 import router as api_router_v2
 from app.core.exceptions import CRMEngineException, DatabaseException
 from app.application.dtos import BaseResponse, success_response, error_response
 from app.core.config import settings
@@ -82,9 +83,26 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# 라우터 등록 (Spring의 Component Scan 결과 등록과 유사)
-# prefix="/api/v1" -> 모든 주소 앞에 /api/v1이 붙음
-app.include_router(api_router, prefix="/api/v1", tags=["CRM"])
+# ──────────────────────────────────────────────────
+# 라우터 등록 (API Version Management)
+# ──────────────────────────────────────────────────
+
+# v1 API: 기존 형식 (List, dict 직접 반환)
+# deprecated: v2 사용을 권장하지만 하위 호환성을 위해 유지
+app.include_router(
+    api_router_v1,
+    prefix="/api/v1",
+    tags=["CRM v1 (Deprecated)"],
+    deprecated=True
+)
+
+# v2 API: BaseResponse 표준 형식
+# 모든 엔드포인트가 일관된 success, data, error, message, timestamp 필드 제공
+app.include_router(
+    api_router_v2,
+    prefix="/api/v2",
+    tags=["CRM v2 (Recommended)"]
+)
 
 @app.get("/", response_model=BaseResponse)
 async def health_check():
