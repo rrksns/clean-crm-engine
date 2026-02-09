@@ -1,6 +1,6 @@
 # 🚀 프로젝트 진행 상황
 
-## 📅 최종 업데이트: 2026-02-08
+## 📅 최종 업데이트: 2026-02-09
 
 ---
 
@@ -127,6 +127,14 @@
   - 인덱스 생성 검증 테스트 3개 추가 (tests/test_indexes.py)
   - COLLSCAN 방지, 모든 쿼리가 IXSCAN 사용
 
+- [x] **3-4. API 버전 관리 (v2)** ✅
+  - BaseResponse 표준 형식의 v2 API 추가 (app/interface/api/routes_v2.py)
+  - 모든 엔드포인트 BaseResponse로 감싸기 (success, data, error, message, timestamp)
+  - v1 API는 deprecated 표시하여 하위 호환성 유지
+  - main.py에 v1/v2 라우터 등록 (/api/v1, /api/v2)
+  - v2 API 테스트 6개 추가 (tests/test_api_v2.py)
+  - 점진적 마이그레이션 가능 (클라이언트가 원하는 시기에 v2로 전환)
+
 #### 보안 강화
 - [ ] **3-4. Rate Limiting 구현**
   - API 남용 방지
@@ -194,10 +202,10 @@
   - `add_all()` + `EventRepository` + `MessageRepository` 인터페이스 추가
 
 ### 우선순위 중간
-- [ ] API 응답 형식 마이그레이션
-  - 기존 엔드포인트를 BaseResponse 형식으로 변경 필요
-  - `/api/v1/events`, `/api/v1/campaigns` 등
-  - 하위 호환성 고려
+- [x] API 응답 형식 마이그레이션 → **해소완료**
+  - v2 API 추가 (BaseResponse 표준 형식)
+  - v1 API는 하위 호환성을 위해 유지 (deprecated 표시)
+  - 점진적 마이그레이션 전략 적용
 
 - [x] 테스트 커버리지 부족 → **해소완료**
   - API 통합 테스트: 19개 (test_api.py)
@@ -234,9 +242,15 @@
   - 데이터 증가 시에도 일정한 성능 유지
   - 총 10개 인덱스 생성 (campaigns 1개, user_events 3개, crm_messages 3개)
 
+- **API 버전 관리**: 표준화된 응답 형식 제공
+  - v2 API 추가 (BaseResponse 형식: success, data, error, message, timestamp)
+  - v1 API는 하위 호환성 유지 (deprecated 표시)
+  - 점진적 마이그레이션으로 무중단 전환 가능
+  - 프론트엔드에서 일관된 에러 핸들링 가능
+
 ### 코드 품질
 - **아키텍처**: Clean Architecture + DDD 적용
-- **테스트**: 28개 통과 (API 19개, 캐시 5개, 인덱스 3개, 도메인 1개)
+- **테스트**: 34개 통과 (API v1 19개, API v2 6개, 캐시 5개, 인덱스 3개, 도메인 1개)
 - **에러 처리**: 3계층 방어선 (Repository → API → 전역)
 - **문서화**: CLAUDE.md, README.md, PROGRESS.md 지속 업데이트
 
@@ -257,7 +271,8 @@
 5. ✅ **페이지네이션 구현** — 완료 (cursor 기반, 테스트 6개)
 6. ✅ **캐싱 레이어 구현** — 완료 (Redis Cache-Aside 패턴, 테스트 5개)
 7. ✅ **데이터베이스 인덱스 최적화** — 완료 (10개 인덱스, 테스트 3개)
-8. **Rate Limiting 구현** (다음 Sprint)
+8. ✅ **API 버전 관리 (v2)** — 완료 (BaseResponse 표준 형식, 테스트 6개)
+9. **Rate Limiting 구현** (다음 Sprint)
    - API 남용 방지
    - IP 기반 요청 제한 (100 req/min)
 
@@ -272,5 +287,5 @@
 
 ---
 
-**마지막 업데이트**: 2026-02-08
-**다음 리뷰 일정**: Phase 3-4 (Rate Limiting) 완료 후
+**마지막 업데이트**: 2026-02-09
+**다음 리뷰 일정**: Phase 3-5 (Rate Limiting) 완료 후
