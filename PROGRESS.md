@@ -1,6 +1,6 @@
 # 🚀 프로젝트 진행 상황
 
-## 📅 최종 업데이트: 2026-02-09
+## 📅 최종 업데이트: 2026-02-10
 
 ---
 
@@ -135,39 +135,48 @@
   - v2 API 테스트 6개 추가 (tests/test_api_v2.py)
   - 점진적 마이그레이션 가능 (클라이언트가 원하는 시기에 v2로 전환)
 
+- [x] **3-5. 헬스체크 리팩토링 (Kubernetes 스타일)** ✅
+  - Kubernetes liveness/readiness probe 패턴 적용
+  - GET / → API 정보 및 네비게이션 (헬스체크 아님)
+  - GET /health/live → Liveness Probe (앱 크래시 감지, 외부 의존성 체크 안함)
+  - GET /health/ready → Readiness Probe (DB 연결 포함, 트래픽 수신 준비 확인)
+  - BaseResponse 형식 적용 (readiness만)
+  - 헬스체크 테스트 8개 추가 (tests/test_health.py)
+  - K8s 배포 시 liveness/readiness probe 활용 가능
+
 #### 보안 강화
-- [ ] **3-4. Rate Limiting 구현**
+- [ ] **3-6. Rate Limiting 구현**
   - API 남용 방지
   - IP 기반 요청 제한
   - slowapi 라이브러리 활용
   - 제한: 100 req/min per IP
 
-- [ ] **3-5. 인증/인가 시스템**
+- [ ] **3-7. 인증/인가 시스템**
   - JWT 기반 인증
   - API Key 인증 (선택적)
   - 역할 기반 접근 제어 (RBAC)
   - 의존성: `python-jose`, `passlib`
 
-- [ ] **3-6. 입력 검증 강화**
+- [ ] **3-8. 입력 검증 강화**
   - Pydantic validator 추가
   - SQL Injection 방지 (NoSQL Injection 포함)
   - XSS 방지
   - CSRF 토큰 (필요 시)
 
 #### 모니터링 & 관측성
-- [ ] **3-7. 메트릭 수집**
+- [ ] **3-9. 메트릭 수집**
   - Prometheus 메트릭 노출
   - API 응답 시간, 에러율 추적
   - DB 연결 풀 상태 모니터링
   - 의존성: `prometheus-fastapi-instrumentator`
 
-- [ ] **3-8. 분산 추적 (Tracing)**
+- [ ] **3-10. 분산 추적 (Tracing)**
   - OpenTelemetry 연동
   - 요청 흐름 추적
   - 병목 지점 파악
   - 의존성: `opentelemetry-api`, `opentelemetry-sdk`
 
-- [ ] **3-9. 로그 집계**
+- [ ] **3-11. 로그 집계**
   - 구조화된 로깅 (JSON 형식)
   - ELK Stack 또는 CloudWatch 연동
   - 로그 레벨별 필터링
@@ -250,14 +259,14 @@
 
 ### 코드 품질
 - **아키텍처**: Clean Architecture + DDD 적용
-- **테스트**: 34개 통과 (API v1 19개, API v2 6개, 캐시 5개, 인덱스 3개, 도메인 1개)
+- **테스트**: 42개 통과 (API v1 19개, API v2 6개, 헬스체크 8개, 캐시 5개, 인덱스 3개, 도메인 1개)
 - **에러 처리**: 3계층 방어선 (Repository → API → 전역)
 - **문서화**: CLAUDE.md, README.md, PROGRESS.md 지속 업데이트
 
 ### 운영 준비도
-- **헬스체크**: DB 연결 상태 실시간 확인
+- **헬스체크**: Kubernetes liveness/readiness probe 지원, DB 연결 상태 실시간 확인
 - **로깅**: 구조화된 로깅 시스템
-- **에러 응답**: 표준화된 형식
+- **에러 응답**: 표준화된 형식 (BaseResponse)
 - **Docker**: 컨테이너화 완료
 
 ---
@@ -272,7 +281,8 @@
 6. ✅ **캐싱 레이어 구현** — 완료 (Redis Cache-Aside 패턴, 테스트 5개)
 7. ✅ **데이터베이스 인덱스 최적화** — 완료 (10개 인덱스, 테스트 3개)
 8. ✅ **API 버전 관리 (v2)** — 완료 (BaseResponse 표준 형식, 테스트 6개)
-9. **Rate Limiting 구현** (다음 Sprint)
+9. ✅ **헬스체크 리팩토링** — 완료 (Kubernetes liveness/readiness probe, 테스트 8개)
+10. **Rate Limiting 구현** (다음 Sprint)
    - API 남용 방지
    - IP 기반 요청 제한 (100 req/min)
 
@@ -287,5 +297,5 @@
 
 ---
 
-**마지막 업데이트**: 2026-02-09
-**다음 리뷰 일정**: Phase 3-5 (Rate Limiting) 완료 후
+**마지막 업데이트**: 2026-02-10
+**다음 리뷰 일정**: Phase 3-6 (Rate Limiting) 완료 후

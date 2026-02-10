@@ -104,36 +104,78 @@ app.include_router(
     tags=["CRM v2 (Recommended)"]
 )
 
-@app.get("/", response_model=BaseResponse)
-async def health_check():
+@app.get("/")
+async def root():
     """
-    서비스 헬스체크 엔드포인트
-
-    서버와 데이터베이스의 연결 상태를 확인합니다.
-    - 성공: 200 OK (모든 시스템 정상)
-    - 실패: 503 Service Unavailable (DB 연결 실패)
+    API 루트 엔드포인트 - 서비스 정보 제공
 
     Returns:
-        BaseResponse: 서비스 상태 정보
+        dict: 서비스 메타데이터 및 주요 엔드포인트 링크
     """
-    health_status = {
+    return {
+        "service": "Clean CRM Engine",
+        "description": "이벤트 기반 마케팅 자동화 API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "health": {
+            "liveness": "/health/live",
+            "readiness": "/health/ready"
+        },
+        "api": {
+            "v1": "/api/v1 (deprecated)",
+            "v2": "/api/v2 (recommended)"
+        }
+    }
+
+
+@app.get("/health/live")
+async def liveness_probe():
+    """
+    Liveness Probe - 애플리케이션이 살아있는지 확인
+
+    Kubernetes liveness probe용 엔드포인트입니다.
+    외부 의존성(DB, Redis 등)을 체크하지 않고, 애플리케이션이 크래시되지 않았는지만 확인합니다.
+
+    Returns:
+        dict: 항상 {"status": "alive"} 반환 (200 OK)
+    """
+    return {"status": "alive"}
+
+
+@app.get("/health/ready", response_model=BaseResponse)
+async def readiness_probe():
+    """
+    Readiness Probe - 트래픽을 받을 준비가 되었는지 확인
+
+    Kubernetes readiness probe용 엔드포인트입니다.
+    데이터베이스 연결 상태를 포함한 모든 의존성을 체크합니다.
+
+    - 성공: 200 OK (모든 시스템 정상, 트래픽 수신 가능)
+    - 실패: 503 Service Unavailable (의존성 문제, 트래픽 수신 불가)
+
+    Returns:
+        BaseResponse: 서비스 준비 상태 정보
+    """
+    readiness_status = {
         "service": "Clean CRM Engine",
         "version": "1.0.0",
-        "status": "healthy"
+        "status": "ready"
     }
 
     # DB 연결 상태 확인
     client = get_db_client()
     if client is None:
         # 클라이언트가 초기화되지 않음
-        health_status["database"] = "not_initialized"
-        logger.warning("Health check: Database client not initialized")
+        readiness_status["database"] = "not_initialized"
+        readiness_status["status"] = "not_ready"
+        logger.warning("Readiness check: Database client not initialized")
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content=error_response(
                 error_code="DB_NOT_INITIALIZED",
                 error_message="데이터베이스가 초기화되지 않았습니다",
-                message="서비스 일시 중지"
+                message="서비스 준비 안됨"
             ).model_dump()
         )
 
@@ -141,19 +183,19 @@ async def health_check():
     try:
         # MongoDB의 admin 명령으로 연결 상태 확인
         await client.admin.command('ping')
-        health_status["database"] = "connected"
-        logger.info("Health check: All systems operational")
+        readiness_status["database"] = "connected"
+        logger.info("Readiness check: All systems operational")
 
         return success_response(
-            data=health_status,
-            message="모든 시스템 정상 작동 중"
+            data=readiness_status,
+            message="트래픽 수신 준비 완료"
         )
 
     except Exception as e:
         # DB 연결 실패
-        health_status["database"] = "disconnected"
-        health_status["status"] = "unhealthy"
-        logger.error(f"Health check failed: {str(e)}", exc_info=True)
+        readiness_status["database"] = "disconnected"
+        readiness_status["status"] = "not_ready"
+        logger.error(f"Readiness check failed: {str(e)}", exc_info=True)
 
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -161,6 +203,6 @@ async def health_check():
                 error_code="DB_CONNECTION_FAILED",
                 error_message="데이터베이스 연결 실패",
                 details=str(e),
-                message="서비스 일시 중지"
+                message="서비스 준비 안됨"
             ).model_dump()
         )

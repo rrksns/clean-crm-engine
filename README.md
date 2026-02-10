@@ -17,7 +17,7 @@
 
 ### 🎯 핵심 기능
 * **실시간 이벤트 감지:** 장바구니 담기, 상품 조회 등 사용자 행동 수집.
-* **타겟팅 룰 엔진:** 마케터가 설정한 조건(예: 5만원 이상 장바구니 & 미구매) 매칭 로직.
+* **타겟팅 룰 엔진:** 마케터가 설정한 조건(예: 5무만원 이상 장바구니 & 미구매) 매칭 로직.
 * **고성능 배치 처리:** 대량의 이벤트를 한 번에 처리하는 `Batch API` 구현 (단건 대비 **20배 성능 향상**).
 * **Redis 캐싱:** 활성 캠페인 조회에 Cache-Aside 패턴 적용, 반복 조회 성능 대폭 향상 (TTL 5분).
 * **DB 인덱스 최적화:** 10개 인덱스로 쿼리 성능 O(log n) 개선, COLLSCAN → IXSCAN 전환.
@@ -129,26 +129,63 @@ CRMEngineException (기본 예외)
 - **v1**: `/api/v1/*` - 기존 형식 (deprecated, 하위 호환성 유지)
 - **v2**: `/api/v2/*` - BaseResponse 표준 형식 (권장) ⭐
 
-### 1. 헬스체크
+### 1. API 정보 (루트)
 ```http
 GET /
 ```
-**응답 예시:**
+**응답:**
+```json
+{
+  "service": "Clean CRM Engine",
+  "description": "이벤트 기반 마케팅 자동화 API",
+  "version": "1.0.0",
+  "docs": "/docs",
+  "health": {
+    "liveness": "/health/live",
+    "readiness": "/health/ready"
+  },
+  "api": {
+    "v1": "/api/v1 (deprecated)",
+    "v2": "/api/v2 (recommended)"
+  }
+}
+```
+
+### 2. 헬스체크 (Kubernetes 스타일)
+
+#### Liveness Probe (앱 살아있는지 확인)
+```http
+GET /health/live
+```
+**용도**: Kubernetes liveness probe, 앱 크래시 감지
+**응답**: 항상 200 OK (외부 의존성 체크 없음)
+```json
+{
+  "status": "alive"
+}
+```
+
+#### Readiness Probe (트래픽 수신 준비 확인)
+```http
+GET /health/ready
+```
+**용도**: Kubernetes readiness probe, 트래픽 수신 가능 여부
+**응답**: DB 연결 포함 상태 체크
 ```json
 {
   "success": true,
   "data": {
     "service": "Clean CRM Engine",
     "version": "1.0.0",
-    "status": "healthy",
+    "status": "ready",
     "database": "connected"
   },
-  "message": "모든 시스템 정상 작동 중",
-  "timestamp": "2026-02-09T10:30:00"
+  "message": "트래픽 수신 준비 완료",
+  "timestamp": "2026-02-10T00:54:03"
 }
 ```
 
-### 2. 이벤트 수신 (단건)
+### 3. 이벤트 수신 (단건)
 ```http
 POST /api/v2/events  (권장)
 POST /api/v1/events  (deprecated)
@@ -178,7 +215,7 @@ POST /api/v1/events  (deprecated)
 }
 ```
 
-### 3. 이벤트 배치 처리 (고성능) ⚡
+### 4. 이벤트 배치 처리 (고성능) ⚡
 ```http
 POST /api/v2/events/batch  (권장)
 POST /api/v1/events/batch  (deprecated)
@@ -191,7 +228,7 @@ POST /api/v1/events/batch  (deprecated)
 ]
 ```
 
-### 4. 캠페인 생성
+### 5. 캠페인 생성
 ```http
 POST /api/v2/campaigns  (권장)
 POST /api/v1/campaigns  (deprecated)
@@ -206,7 +243,7 @@ POST /api/v1/campaigns  (deprecated)
 }
 ```
 
-### 5. 캠페인 목록 조회 (페이지네이션)
+### 6. 캠페인 목록 조회 (페이지네이션)
 ```http
 GET /api/v2/campaigns?cursor=<cursor>&limit=20&status=active
 ```
@@ -248,7 +285,7 @@ open http://localhost:8000/docs
 ## 🧪 테스트
 
 ```bash
-# 전체 테스트 실행 (34개)
+# 전체 테스트 실행 (42개)
 PYTHONPATH=. pytest tests/ -v
 
 # API v1 테스트 (19개)
@@ -256,6 +293,9 @@ PYTHONPATH=. pytest tests/test_api.py -v
 
 # API v2 테스트 (6개)
 PYTHONPATH=. pytest tests/test_api_v2.py -v
+
+# 헬스체크 테스트 (8개)
+PYTHONPATH=. pytest tests/test_health.py -v
 
 # 캐시 테스트 (5개)
 PYTHONPATH=. pytest tests/test_cache.py -v
@@ -287,7 +327,7 @@ PYTHONPATH=. pytest tests/test_domain.py -v
 | **아키텍처** | Clean Architecture + DDD 적용 |
 | **API 버전 관리** | v2 API 추가 (BaseResponse), v1 하위 호환 유지 |
 | **에러 처리** | 3계층 방어선 (Repository → API → 전역) |
-| **테스트** | 34개 테스트 통과 (API v1 19, v2 6, 캐시 5, 인덱스 3, 도메인 1) |
+| **테스트** | 42개 테스트 통과 (API v1 19, v2 6, 헬스체크 8, 캐시 5, 인덱스 3, 도메인 1) |
 | **운영 준비** | 헬스체크, 로깅, 표준화된 API 응답, graceful degradation |
 | **문서화** | CLAUDE.md, README.md, PROGRESS.md 지속 업데이트 |
 
@@ -331,5 +371,5 @@ PYTHONPATH=. pytest tests/test_domain.py -v
 
 ---
 
-**마지막 업데이트**: 2026-02-09
+**마지막 업데이트**: 2026-02-10
 **다음 계획**: Rate Limiting 구현, 인증/인가 시스템
